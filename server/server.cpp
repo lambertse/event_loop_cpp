@@ -1,97 +1,115 @@
 #include "server.h"
 #include "server_define.h"
-#include "utils.h"
+#include "shared/logging.h"
+#include "shared/utils.h"
 #include <csignal>
 
 #include <cstddef>
 #include <cstring>
 #include <map>
 #include <memory>
-#include <netinet/in.h>
 #include <netinet/ip.h>
 #include <poll.h>
-#include <sys/poll.h>
+#include <string>
+#include <sys/epoll.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <vector>
 
+constexpr int MAX_EVENTS = 10;
+
 class ServerImpl {
 public:
-  ServerImpl();
-  ~ServerImpl();
-  bool init() {
-    fd = socket(AF_INET, SOCK_STREAM, 0);
+  ServerImpl() {}
+  ~ServerImpl() {}
+  bool init(int port) {
+    serverFD = socket(AF_INET, SOCK_STREAM, 0);
     int val = false;
-    setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val));
-    if (fd < 0) {
-      std::cout << "fd is not valid " << fd << std::endl;
+    setsockopt(serverFD, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val));
+    if (serverFD < 0) {
+      LOG_DEBUG("fd is not valid " + std::to_string(serverFD));
       return false;
     }
-    utils::set_fb_nonblocking(fd);
+    utils::set_fb_nonblocking(serverFD);
 
-    struct sockaddr_in addr;
     addr.sin_family = AF_INET;
-    addr.sin_port = htons(8080);
-    // Localhost address
+    addr.sin_port = htons(port);
     addr.sin_addr.s_addr = htonl(0);
-    if (bind(fd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
-      std::cout << "bind failed" << std::endl;
+
+    if (bind(serverFD, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
+      LOG_DEBUG("bind failed");
       return false;
     }
-    if (listen(fd, 5) < 0) {
-      std::cout << "listen failed" << std::endl;
+    if (listen(serverFD, 5) < 0) {
+      LOG_DEBUG("listen failed");
       return false;
     }
-    std::cout << "Server is listening on port 8080" << std::endl;
+    LOG_INFO("Server is listening on port " + std::to_string(port));
+
+    struct epoll_event ev;
+    epollFD = epoll_create1(0);
+    if (epollFD == -1) {
+      LOG_INFO("epoll_create1 failed: " + std::to_string(errno));
+      return false;
+    }
+
+    ev.events = EPOLLIN;
+    ev.data.fd = serverFD;
+    if (epoll_ctl(epollFD, EPOLL_CTL_ADD, serverFD, &ev) == -1) {
+      LOG_INFO("epoll_ctl: listen_sock");
+      return false;
+    }
 
     return true;
   }
 
   bool start() {
-    std::vector<struct pollfd> poll_args;
+    LOG_INFO("Server started with fd " + std::to_string(serverFD));
+    int nfds;
+    struct epoll_event events[MAX_EVENTS];
     while (true) {
-      poll_args.clear();
-      struct pollfd lisFD = {fd, POLL_IN, 0};
-      poll_args.push_back(lisFD);
+      nfds = epoll_wait(epollFD, events, MAX_EVENTS, -1);
+      for (int n = 0; n < nfds; ++n) {
+        if (events[n].data.fd == serverFD) {
+          accept_new_conn();
+        } else {
+          int fd = events[n].data.fd;
+          if (fd2Conn.count(fd) <= 0) {
+            LOG_INFO("Connection not found for fd: " + std::to_string(fd));
+            continue;
+          }
+          ConnectionSharedPtr conn = fd2Conn[fd];
 
-      for (auto &[fd, con] : fd2Conn) {
-        if (!con)
-          continue;
+          if (conn->state == ConnectionState::END) {
+            LOG_DEBUG("Connection ended for fd: " + std::to_string(fd));
+            close(fd);
+            fd2Conn.erase(fd);
+            continue;
+          }
 
-        struct pollfd pfd = {};
-        pfd.fd = con->fd;
-        pfd.events =
-            (con->state == ConnectionState::REQUEST) ? POLL_IN : POLL_OUT;
-        pfd.events |= POLL_ERR;
-        poll_args.push_back(pfd);
-      }
-
-      int rc = poll(poll_args.data(), nfds_t(poll_args.size()), 1000);
-      if (rc < 0) {
-        std::cout << "poll error: " << errno << std::endl;
-        continue;
-      }
-
-      for (auto &p : poll_args) {
-        if (!p.revents)
-          continue;
-        ConnectionSharedPtr con = fd2Conn[p.fd];
-        connection_io(con);
-        if (con->state == ConnectionState::END) {
-          fd2Conn[p.fd] = nullptr;
-          (void)close(p.fd);
+          connection_io(conn);
         }
-      }
-
-      if (poll_args.front().revents) {
-        accept_new_conn();
       }
     }
   }
 
-  bool stop();
+  bool stop() {
+    // Close all connections
+    for (auto &[fd, con] : fd2Conn) {
+      if (con) {
+        (void)close(fd);
+      }
+    }
+    fd2Conn.clear();
+    (void)close(serverFD);
+    return true;
+  }
 
-  bool deinit();
+  bool deinit() {
+    LOG_DEBUG("Deinitializing server");
+    stop();
+    return true;
+  }
 
   void connection_io(ConnectionSharedPtr conn) {
     if (conn->state == ConnectionState::REQUEST) {
@@ -102,10 +120,12 @@ public:
   }
 
   void state_request(ConnectionSharedPtr conn) {
+    LOG_DEBUG("state_request: " + std::to_string(conn->fd));
     do {
       ssize_t rc = 0;
       do {
         ssize_t cap = sizeof(conn->rbuf) - conn->rbuf_size;
+        LOG_DEBUG("Reading data, capacity: " + std::to_string(cap));
         rc = read(conn->fd, &conn->rbuf[conn->rbuf_size], cap);
       } while (rc < 0 && errno == EINTR);
 
@@ -114,16 +134,16 @@ public:
           // Got EAGAIN, stop it
           break;
         } else {
-          std::cout << "read() error" << errno << std::endl;
+          LOG_DEBUG("read() error" + std::to_string(errno));
           break;
         }
       }
 
       if (rc == 0) {
         if (conn->rbuf_size > 0) {
-          std::cout << "Unexpected EOF\n";
+          LOG_DEBUG("Unexpected EOF");
         } else {
-          std::cout << "EOF\n";
+          LOG_DEBUG("EOF");
         }
         conn->state = ConnectionState::END;
         break;
@@ -142,8 +162,9 @@ public:
     }
     u_int32_t len = 0;
     memcpy(&len, &conn->rbuf[0], 4);
+    LOG_DEBUG("Request length: " + std::to_string(len));
     if (len > k_max_msg) {
-      std::cout << "Too long\n";
+      LOG_DEBUG("Too long");
       conn->state = ConnectionState::END;
       return false;
     }
@@ -152,10 +173,11 @@ public:
       return false;
     }
 
-    std::cout << "Client says: " << conn->rbuf << std::endl;
+    LOG_INFO(std::to_string(++totalConnected) + " Client says: " +
+             std::string(reinterpret_cast<char *>(&conn->rbuf[4])));
     // Response to client
     memcpy(&conn->wbuf[0], &len, 4);
-    memcpy(&conn->wbuf[0], &conn->rbuf[4], len);
+    memcpy(&conn->wbuf[4], &conn->rbuf[4], len);
     conn->wbuf_size = 4 + len;
     conn->state = ConnectionState::RESPONSE;
 
@@ -172,6 +194,7 @@ public:
   }
 
   void state_response(ConnectionSharedPtr conn) {
+    LOG_DEBUG("state_response: " + std::to_string(conn->fd));
     do {
       ssize_t rv = 0;
       do {
@@ -184,7 +207,7 @@ public:
           // Got EAGAIN, stop it
           break;
         } else {
-          std::cout << "write() error: " << errno << std::endl;
+          LOG_DEBUG("write() error: " + std::to_string(errno));
           conn->state = ConnectionState::END;
           break;
         }
@@ -200,11 +223,21 @@ public:
   }
 
   void accept_new_conn() {
-    sockaddr_in client_addr{};
-    socklen_t socklen = sizeof(client_addr);
-    int connFD = accept(fd, (sockaddr *)&client_addr, &socklen);
+    socklen_t addrlen = sizeof(addr);
+    auto connFD = accept(serverFD, (struct sockaddr *)&addr, &addrlen);
+    if (connFD == -1) {
+      LOG_INFO("accept failed: " + std::to_string(errno));
+      exit(EXIT_FAILURE);
+    }
     utils::set_fb_nonblocking(connFD);
-
+    epoll_event ev;
+    ev.events = EPOLLIN | EPOLLET;
+    ev.data.fd = connFD;
+    if (epoll_ctl(epollFD, EPOLL_CTL_ADD, connFD, &ev) == -1) {
+      LOG_INFO("epoll_ctl: conn_sock");
+      exit(EXIT_FAILURE);
+    }
+    LOG_DEBUG("accept_new_conn with fd " + std::to_string(connFD));
     ConnectionSharedPtr newConn = std::make_shared<Connection>();
     newConn->fd = connFD;
     newConn->state = ConnectionState::REQUEST;
@@ -213,14 +246,18 @@ public:
   }
 
 public:
-  int fd;
+  int serverFD;
+  int epollFD;
   FDConnectionMap fd2Conn;
+  struct sockaddr_in addr;
+
+  int totalConnected = 0;
 };
 
 // Server object
 Server::Server() { _impl = std::make_shared<ServerImpl>(); }
 Server::~Server() {}
-bool Server::init() { return _impl->init(); }
+bool Server::init(int port) { return _impl->init(port); }
 bool Server::start() { return _impl->start(); }
 bool Server::stop() { return _impl->stop(); }
 bool Server::deinit() { return _impl->deinit(); }

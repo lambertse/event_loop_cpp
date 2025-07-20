@@ -7,7 +7,7 @@ public:
   Server();
   ~Server();
 
-  bool init();
+  bool init(int port = 8123);
   bool start();
   bool stop();
   bool deinit();

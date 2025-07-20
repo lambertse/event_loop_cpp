@@ -2,6 +2,7 @@
 #include <cerrno>
 #include <fcntl.h>
 #include <iostream>
+constexpr int k_max_msg = 256;
 
 namespace utils {
 static void set_fb_nonblocking(int &fd) {

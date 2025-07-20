@@ -1,9 +1,8 @@
 #pragma once
+#include "shared/utils.h"
 #include <cstdint>
 #include <map>
 #include <memory>
-
-constexpr int k_max_msg = 256;
 
 enum ConnectionState {
   REQUEST = 0,
