@@ -10,6 +10,8 @@
 #include <thread>
 #include <vector>
 
+#include "proto/request.pb.h"
+
 static int send_req(const int &fd, const char *text) {
   LOG_DEBUG("Sending request: " + std::string(text));
   int len = strlen(text);
@@ -38,14 +40,14 @@ static int read_res(const int &fd, char *text) {
   return 0;
 }
 
-int handle_a_client() {
+request::Response *handle_a_client(const request::Request &req) {
   LOG_DEBUG("Client started");
-  const char *msg = "hello!!!";
-  int fd = socket(AF_INET, SOCK_STREAM, 0);
 
+  int fd = socket(AF_INET, SOCK_STREAM, 0);
+  request::Response *res = nullptr;
   if (fd < 0) {
     LOG_DEBUG("can not create fd");
-    return -1;
+    return nullptr;
   }
 
   const int port = 8100;
@@ -61,10 +63,12 @@ int handle_a_client() {
   if (rv < 0) {
     LOG_DEBUG("connect failed: " + std::to_string(errno));
     close(fd);
-    return -1;
+    return nullptr;
   }
-
-  int err = send_req(fd, msg);
+  char sendbuf[260];
+  LOG_INFO("Request msg: " + req.msg());
+  req.SerializeToArray(&sendbuf, sizeof(sendbuf));
+  int err = send_req(fd, sendbuf);
   if (err) {
     LOG_DEBUG("send_req failed: " + std::to_string(errno));
     goto L_DONE;
@@ -76,19 +80,47 @@ int handle_a_client() {
     goto L_DONE;
   }
   LOG_INFO("Res: " + std::string(reinterpret_cast<char *>(&buf[0])));
+  res = new request::Response();
+  res->ParseFromArray(buf, sizeof(buf));
 
 L_DONE:
   LOG_DEBUG("Closing fd: " + std::to_string(fd));
   close(fd);
-  return 0;
+  return res;
 }
 
 int main() {
-  logging::log_level = logging::DEBUG;
   std::vector<std::thread> threads;
+  // Random vector string of 20 random string:
+  std::vector<std::string> random_strings = {"Hello, World!",
+                                             "Protobuf is great!",
+                                             "Multithreading in C++",
+                                             "Network programming",
+                                             "Socket communication",
+                                             "Concurrency",
+                                             "Thread safety",
+                                             "C++ best practices",
+                                             "Error handling",
+                                             "Performance optimization",
+                                             "Data serialization",
+                                             "Protocol buffers",
+                                             "Asynchronous programming",
+                                             "Event-driven architecture",
+                                             "Client-server model",
+                                             "Network protocols",
+                                             "TCP/IP stack",
+                                             "Socket programming in C++",
+                                             "C++ networking libraries",
+                                             "Cross-platform development"};
   const int numClients = 20;
   for (int i = 0; i < numClients; i++) {
-    threads.emplace_back(handle_a_client);
+    threads.emplace_back([&]() {
+      request::Request req;
+      req.set_msg(random_strings[i]);
+      auto res = handle_a_client(req);
+      std::cout << "Response from client: "
+                << (res ? res->msg() : "No response") << std::endl;
+    });
   }
   for (auto &t : threads) {
     if (t.joinable()) {

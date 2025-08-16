@@ -14,9 +14,11 @@
 #include <string>
 #include <vector>
 
+#include "proto/request.pb.h"
 #include "server_define.h"
 #include "shared/logging.h"
 #include "shared/utils.h"
+
 constexpr int MAX_EVENTS = 10;
 class ServerImpl {
  public:
@@ -141,13 +143,24 @@ class ServerImpl {
       // Not enough data in the buffer
       return false;
     }
+    std::string inBuf = std::string(reinterpret_cast<char *>(&conn->rbuf[4]));
+    LOG_DEBUG(std::to_string(++totalConnected) +
+              ". Incomming buffer: " + inBuf);
+    request::Request req;
+    req.ParseFromString(inBuf);
+    LOG_INFO("Incomming message: " + req.msg());
 
-    LOG_INFO(std::to_string(++totalConnected) + " Client says: " +
-             std::string(reinterpret_cast<char *>(&conn->rbuf[4])));
-    // Response to client
-    memcpy(&conn->wbuf[0], &len, 4);
-    memcpy(&conn->wbuf[4], &conn->rbuf[4], len);
-    conn->wbuf_size = 4 + len;
+    request::Response res;
+    res.set_msg("Hello, " + req.msg() + " from server");
+    std::string outBuf;
+    res.SerializeToString(&outBuf);
+
+    size_t outputlen = outBuf.length();
+    char *outBufChar = new char[outputlen];
+    memcpy(outBufChar, outBuf.data(), outputlen);
+    memcpy(&conn->wbuf[0], &outputlen, 4);
+    memcpy(&conn->wbuf[4], &outBufChar, outputlen);
+    conn->wbuf_size = 4 + outputlen;
     conn->state = ConnectionState::RESPONSE;
 
     // Remove the processed data from the read buffer

@@ -1,0 +1,12 @@
+syntax = "proto2";
+
+package request;
+
+message Request {
+  optional string msg = 1;
+}
+
+message Response {
+  optional string msg = 1; 
+  optional int32 code = 2;
+}
