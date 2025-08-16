@@ -9,7 +9,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
-
+set(ENABLE_TESTING ON)
 # ============================================================================
 # Platform Detection
 # ============================================================================
@@ -142,7 +142,7 @@ target_link_libraries(client_${PROJECT_NAME} PRIVATE
 # ============================================================================
 # Testing (Optional)
 # ============================================================================
-if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+if(ENABLE_TESTING)
     enable_testing()
-    # Add test targets here if needed
+    add_subdirectory(tests)
 endif()
