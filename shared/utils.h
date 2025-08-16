@@ -1,6 +1,7 @@
 #pragma once
-#include <cerrno>
 #include <fcntl.h>
+
+#include <cerrno>
 #include <iostream>
 constexpr int k_max_msg = 256;
 
@@ -19,4 +20,4 @@ static void set_fb_nonblocking(int &fd) {
     return;
   }
 }
-} // namespace utils
+}  // namespace utils

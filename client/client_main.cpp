@@ -1,12 +1,13 @@
 
-#include <cstring>
 #include <netinet/in.h>
 #include <shared/logging.h>
 #include <shared/utils.h>
-#include <string>
 #include <sys/socket.h>
-#include <thread>
 #include <unistd.h>
+
+#include <cstring>
+#include <string>
+#include <thread>
 #include <vector>
 
 static int send_req(const int &fd, const char *text) {
@@ -15,8 +16,7 @@ static int send_req(const int &fd, const char *text) {
   write(fd, &len, 4);
   while (len > 0) {
     auto rv = write(fd, text, len);
-    if (rv <= 0)
-      return -1;
+    if (rv <= 0) return -1;
 
     len -= rv;
     text += rv;
@@ -29,9 +29,8 @@ static int read_res(const int &fd, char *text) {
   auto rv = read(fd, &len, 4);
   LOG_DEBUG("Reading response with len " + std::to_string(len));
   while (len > 0) {
-    auto rv = read(fd, text, len);
-    if (rv <= 0)
-      return -1;
+    rv = read(fd, text, len);
+    if (rv <= 0) return -1;
     text += rv;
     len -= rv;
   }
@@ -85,8 +84,10 @@ L_DONE:
 }
 
 int main() {
+  logging::log_level = logging::DEBUG;
   std::vector<std::thread> threads;
-  for (int i = 0; i < 20; i++) {
+  const int numClients = 20;
+  for (int i = 0; i < numClients; i++) {
     threads.emplace_back(handle_a_client);
   }
   for (auto &t : threads) {

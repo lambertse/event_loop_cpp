@@ -4,14 +4,27 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-set(CMAKE_C_COMPILER_WORKS TRUE)
-set(CMAKE_C_COMPILER clang++)
 
 include_directories(.)
+if(APPLE)
+    set(PLATFORM "macOS")
+    MESSAGE(STATUS "Building for macOS")
+elseif(UNIX)
+    set(PLATFORM "linux")
+    MESSAGE(STATUS "Building for Linux")
+endif()
+#Add some debugging flags
+
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    MESSAGE(STATUS "Building in Debug mode")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
+endif()
 
 add_executable(server_${PROJECT_NAME}
     server/server.cpp
     server/server.h
+    server/server_impl.h
+    server/${PLATFORM}/server_impl.cpp
     server/server_define.h
     server/server_main.cpp
     shared/utils.h

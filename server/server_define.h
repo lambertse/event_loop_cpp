@@ -1,8 +1,9 @@
 #pragma once
-#include "shared/utils.h"
 #include <cstdint>
 #include <map>
 #include <memory>
+
+#include "shared/utils.h"
 
 enum ConnectionState {
   REQUEST = 0,

@@ -3,7 +3,7 @@
 #include <memory>
 
 class Server {
-public:
+ public:
   Server();
   ~Server();
 
@@ -12,6 +12,6 @@ public:
   bool stop();
   bool deinit();
 
-private:
+ private:
   std::shared_ptr<class ServerImpl> _impl;
 };

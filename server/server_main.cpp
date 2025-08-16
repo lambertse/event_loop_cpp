@@ -1,4 +1,5 @@
 #include "server.h"
+#include "shared/logging.h"
 
 int main() {
   Server server;

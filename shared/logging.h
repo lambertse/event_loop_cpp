@@ -4,11 +4,11 @@
 
 namespace logging {
 enum LogLevel {
-  DEBUG = 0,
-  INFO = 1,
+  DEBUG = 1 << 0,
+  INFO = 1 << 1,
 };
 
-static LogLevel log_level = INFO;
+static int log_level = INFO;
 
 static void debug(const std::string &str) {
   if (log_level ^ DEBUG) {
@@ -23,6 +23,6 @@ static void info(const std::string &str) {
   std::cout << "INFO: " << str << std::endl;
 }
 
-} // namespace logging
+}  // namespace logging
 #define LOG_DEBUG(str) logging::debug(str)
 #define LOG_INFO(str) logging::info(str)
