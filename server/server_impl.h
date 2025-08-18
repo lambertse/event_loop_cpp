@@ -143,25 +143,29 @@ class ServerImpl {
       // Not enough data in the buffer
       return false;
     }
-    std::string inBuf = std::string(reinterpret_cast<char *>(&conn->rbuf[4]));
-    LOG_DEBUG(std::to_string(++totalConnected) +
-              ". Incomming buffer: " + inBuf);
     request::Request req;
-    req.ParseFromString(inBuf);
-    LOG_INFO("Incomming message: " + req.msg());
+    req.ParseFromArray(&conn->rbuf[4], len);
+    static int count = 0;
+    LOG_INFO(std::to_string(count++) + ". Incomming message: " + req.msg());
 
     request::Response res;
-    res.set_msg("Hello, " + req.msg() + " from server");
-    std::string outBuf;
-    res.SerializeToString(&outBuf);
+    res.set_msg("Responnse for message: " + req.msg() + " from server");
+    char serializedData[k_max_msg];
+    size_t resLen = res.ByteSizeLong();
+    if (resLen > k_max_msg - 4) {
+      LOG_INFO("Response too large");
+      conn->state = ConnectionState::END;
+      return false;
+    }
+    if (!res.SerializeToArray(serializedData, resLen)) {
+      LOG_INFO("Failed to serialize response");
+      conn->state = ConnectionState::END;
+      return false;
+    }
 
-    size_t outputlen = outBuf.length();
-    char *outBufChar = new char[outputlen];
-    memcpy(outBufChar, outBuf.data(), outputlen);
-    memcpy(&conn->wbuf[0], &outputlen, 4);
-    memcpy(&conn->wbuf[4], &outBufChar, outputlen);
-    conn->wbuf_size = 4 + outputlen;
-    conn->state = ConnectionState::RESPONSE;
+    conn->wbuf_size = resLen + 4;  // +4 for the length prefix
+    memcpy(&conn->wbuf[0], &resLen, 4);
+    memcpy(&conn->wbuf[4], serializedData, resLen);
 
     // Remove the processed data from the read buffer
     size_t remaining = conn->rbuf_size - (4 + len);
