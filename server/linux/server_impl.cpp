@@ -52,7 +52,7 @@ void ServerImpl::_poll(const int &connFD) {
   epoll_event ev;
   ev.events = EPOLLIN | EPOLLET;
   ev.data.fd = connFD;
-  if (epoll_ctl(epollFD, EPOLL_CTL_ADD, connFD, &ev) == -1) {
+  if (epoll_ctl(pollFD, EPOLL_CTL_ADD, connFD, &ev) == -1) {
     LOG_INFO("epoll_ctl: conn_sock");
     exit(EXIT_FAILURE);
   }
