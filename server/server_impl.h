@@ -18,8 +18,6 @@ class ServerImpl {
   bool stop();
   bool deinit();
 
-  void set_message_handler(MessageHandler handler);
-
  private:
   void add_conection(int fd);
   void accept_new_connection();

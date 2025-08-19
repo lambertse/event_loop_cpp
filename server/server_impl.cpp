@@ -55,12 +55,6 @@ bool ServerImpl::stop() {
 
 bool ServerImpl::deinit() { return true; }
 
-void ServerImpl::set_message_handler(MessageHandler handler) {
-  if (_connection_manager) {
-    _connection_manager->set_message_handler(std::move(handler));
-  }
-}
-
 // Private section
 void ServerImpl::add_conection(int fd) {
   if (fd == _server_fd) {

@@ -11,17 +11,19 @@
 #include <vector>
 
 #include "proto/request.pb.h"
+#include "shared/protobuf/protobuf_handler.h"
 
-static int send_req(const int &fd, const char *text) {
-  LOG_DEBUG("Sending request: " + std::string(text));
-  int len = strlen(text);
+static int send_req(const int &fd, const std::vector<char> &data) {
+  LOG_INFO("Sending serialized request of size: " +
+           std::to_string(data.size()));
+  int len = data.size();
   write(fd, &len, 4);
+  const char *buf = data.data();
   while (len > 0) {
-    auto rv = write(fd, text, len);
+    auto rv = write(fd, buf, len);
     if (rv <= 0) return -1;
-
     len -= rv;
-    text += rv;
+    buf += rv;
   }
   return 0;
 }
@@ -65,9 +67,7 @@ request::Response *handle_a_client(const request::Request &req) {
     close(fd);
     return nullptr;
   }
-  char sendbuf[260];
-  LOG_INFO("Request msg: " + req.msg());
-  req.SerializeToArray(&sendbuf[0], sizeof(sendbuf));
+  auto sendbuf = ProtobufHandler::serialize(req);
   int err = send_req(fd, sendbuf);
   if (err) {
     LOG_DEBUG("send_req failed: " + std::to_string(errno));
@@ -80,7 +80,7 @@ request::Response *handle_a_client(const request::Request &req) {
     goto L_DONE;
   }
   res = new request::Response();
-  res->ParseFromArray(&buf[0], sizeof(buf));
+  res->ParseFromArray(buf, strlen(buf));
 
 L_DONE:
   LOG_DEBUG("Closing fd: " + std::to_string(fd));

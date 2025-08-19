@@ -94,10 +94,16 @@ target_link_libraries(proto_generated PUBLIC protobuf::libprotobuf)
 # ============================================================================
 # Shared Library
 # ============================================================================
-add_library(shared_utils INTERFACE)
+add_library(shared_utils STATIC
+    shared/protobuf/protobuf_handler.cpp
+)
 target_include_directories(shared_utils INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/shared
+    ${CMAKE_CURRENT_SOURCE_DIR}/shared/protobuf
+)
+target_link_libraries(shared_utils PUBLIC
+    proto_generated    
 )
 
 # ============================================================================
@@ -114,7 +120,6 @@ target_include_directories(server_${PROJECT_NAME} PRIVATE
 )
 
 target_link_libraries(server_${PROJECT_NAME} PRIVATE
-    proto_generated
     shared_utils
 )
 
@@ -132,7 +137,6 @@ target_include_directories(client_${PROJECT_NAME} PRIVATE
 )
 
 target_link_libraries(client_${PROJECT_NAME} PRIVATE
-    proto_generated
     shared_utils
 )
 

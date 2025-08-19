@@ -4,6 +4,7 @@
 #include "define.h"
 #include "proto/request.pb.h"
 #include "shared/logging.h"
+#include "shared/protobuf/protobuf_handler.h"
 
 ConnectionManager::ConnectionManager() {}
 
@@ -15,9 +16,6 @@ void ConnectionManager::handle_connection_io(ConnectionSharedPtr conn) {
   } else if (conn->state == ConnectionState::RESPONSE) {
     state_response(conn);
   }
-}
-void ConnectionManager::set_message_handler(MessageHandler handler) {
-  _message_handler = std::move(handler);
 }
 
 void ConnectionManager::state_request(ConnectionSharedPtr conn) {
@@ -102,7 +100,7 @@ bool ConnectionManager::try_one_request(ConnectionSharedPtr conn) {
     // Not enough data in the buffer
     return false;
   }
-  request::Request req = _protocol_handler->deserialize(&conn->rbuf[4], len);
+  request::Request req = ProtobufHandler::deserialize(&conn->rbuf[4], len);
   static int count = 0;
   LOG_INFO(std::to_string(count++) + ". Incomming message: " + req.msg());
 
