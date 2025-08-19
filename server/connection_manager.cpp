@@ -23,9 +23,10 @@ void ConnectionManager::state_request(ConnectionSharedPtr conn) {
   do {
     ssize_t rc = 0;
     do {
-      ssize_t cap = sizeof(conn->rbuf) - conn->rbuf_size;
+      ssize_t cap = sizeof(conn->rbuf) - conn->rbuf.size();
       LOG_DEBUG("Reading data, capacity: " + std::to_string(cap));
-      rc = read(conn->fd, &conn->rbuf[conn->rbuf_size], cap);
+      conn->rbuf.resize(conn->rbuf.size() + cap);
+      rc = read(conn->fd, &conn->rbuf[conn->rbuf.size() - cap], cap);
     } while (rc < 0 && errno == EINTR);
 
     if (rc < 0) {
@@ -39,7 +40,7 @@ void ConnectionManager::state_request(ConnectionSharedPtr conn) {
     }
 
     if (rc == 0) {
-      if (conn->rbuf_size > 0) {
+      if (conn->rbuf.size() > 0) {
         LOG_DEBUG("Unexpected EOF");
       } else {
         LOG_DEBUG("EOF");
@@ -47,8 +48,7 @@ void ConnectionManager::state_request(ConnectionSharedPtr conn) {
       conn->state = ConnectionState::END;
       break;
     }
-
-    conn->rbuf_size += size_t(rc);
+    // Maybe need to cover the size here
     while (try_one_request(conn)) {
     }
   } while (conn->state == ConnectionState::REQUEST);
@@ -59,7 +59,7 @@ void ConnectionManager::state_response(ConnectionSharedPtr conn) {
   do {
     ssize_t rv = 0;
     do {
-      ssize_t cap = conn->wbuf_size - conn->wbuf_sent;
+      ssize_t cap = conn->wbuf.size() - conn->wbuf_sent;
       rv = write(conn->fd, &conn->wbuf[conn->wbuf_sent], cap);
     } while (rv < 0 && errno == EINTR);
 
@@ -74,7 +74,7 @@ void ConnectionManager::state_response(ConnectionSharedPtr conn) {
       }
     }
     conn->wbuf_sent += size_t(rv);
-    if (conn->wbuf_sent == conn->wbuf_size) {
+    if (conn->wbuf_sent == conn->wbuf.size()) {
       conn->state = ConnectionState::END;
       conn->wbuf_sent = 0;
       break;
@@ -84,7 +84,7 @@ void ConnectionManager::state_response(ConnectionSharedPtr conn) {
 }
 
 bool ConnectionManager::try_one_request(ConnectionSharedPtr conn) {
-  if (conn->rbuf_size < 4) {
+  if (conn->rbuf.size() < 4) {
     // Not enough data in the buffer, will retry in the next iterator
     return false;
   }
@@ -96,11 +96,12 @@ bool ConnectionManager::try_one_request(ConnectionSharedPtr conn) {
     conn->state = ConnectionState::END;
     return false;
   }
-  if (conn->rbuf_size < 4 + len) {
+  if (conn->rbuf.size() < 4 + len) {
     // Not enough data in the buffer
     return false;
   }
-  request::Request req = ProtobufHandler::deserialize(&conn->rbuf[4], len);
+  request::Request req =
+      ProtobufHandler::deserialize(conn->rbuf.substr(4, len));
   static int count = 0;
   LOG_INFO(std::to_string(count++) + ". Incomming message: " + req.msg());
 
@@ -119,16 +120,17 @@ bool ConnectionManager::try_one_request(ConnectionSharedPtr conn) {
     return false;
   }
 
-  conn->wbuf_size = resLen + 4;  // +4 for the length prefix
+  conn->wbuf.resize(resLen + 4);
   memcpy(&conn->wbuf[0], &resLen, 4);
   memcpy(&conn->wbuf[4], serializedData, resLen);
 
   // Remove the processed data from the read buffer
-  size_t remaining = conn->rbuf_size - (4 + len);
+  size_t remaining = conn->rbuf.size() - (4 + len);
   if (remaining > 0) {
-    memmove(&conn->rbuf[0], &conn->rbuf[4 + len], remaining);
+    conn->rbuf = conn->rbuf.substr(4 + len);
+  } else {
+    conn->rbuf.clear();
   }
-  conn->rbuf_size = remaining;
   //
 
   state_response(conn);

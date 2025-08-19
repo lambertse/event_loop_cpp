@@ -1,15 +1,16 @@
 #include "proto/request.pb.h"
 #include "protobuf_handler.h"
 
-request::Request ProtobufHandler::deserialize(char* data, int len) {
+request::Request ProtobufHandler::deserialize(const std::string& data) {
   request::Request req;
-  if (!req.ParseFromArray(data, len)) {
+  if (!req.ParseFromArray(data.data(), data.size())) {
     req.set_msg("Failed to parse request");
   }
   return req;
 }
-std::vector<char> ProtobufHandler::serialize(request::Request object) {
-  std::vector<char> buffer(object.ByteSizeLong());
+std::string ProtobufHandler::serialize(const request::Request& object) {
+  std::string buffer;
+  buffer.resize(object.ByteSizeLong());
   if (!object.SerializeToArray(buffer.data(), buffer.size())) {
     return {};
   }

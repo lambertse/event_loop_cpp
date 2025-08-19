@@ -13,10 +13,10 @@
 #include "proto/request.pb.h"
 #include "shared/protobuf/protobuf_handler.h"
 
-static int send_req(const int &fd, const std::vector<char> &data) {
+static int send_req(const int &fd, const std::string &data) {
   LOG_INFO("Sending serialized request of size: " +
            std::to_string(data.size()));
-  int len = data.size();
+  int len = data.length();
   write(fd, &len, 4);
   const char *buf = data.data();
   while (len > 0) {
