@@ -103,16 +103,11 @@ target_include_directories(shared_utils INTERFACE
 # ============================================================================
 # Server Executable
 # ============================================================================
-set(SERVER_SOURCES
-    server/server.cpp
-    server/server.h
-    server/server_impl.h
-    server/${PLATFORM}/server_impl.cpp
-    server/server_define.h
-    server/server_main.cpp
-)
 
-add_executable(server_${PROJECT_NAME} ${SERVER_SOURCES})
+file(GLOB SERVER_SOURCES "server/*.cpp")
+file(GLOB SERVER_PLATFORM_SOURCES "server/${PLATFORM}/*.cpp")
+
+add_executable(server_${PROJECT_NAME} ${SERVER_SOURCES} ${SERVER_PLATFORM_SOURCES})
 
 target_include_directories(server_${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/server
