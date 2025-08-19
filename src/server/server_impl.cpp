@@ -2,11 +2,11 @@
 
 #include <memory>
 
-#include "config.h"
-#include "connection_manager.h"
-#include "poll.h"
-#include "server_impl.h"
-#include "shared/logging.h"
+#include "event_loop/config.h"
+#include "event_loop/connection_manager.h"
+#include "event_loop/poll.h"
+#include "event_loop/server_impl.h"
+#include "event_loop/shared/logging.h"
 
 ServerImpl::ServerImpl(ServerConfig config) : _server_fd(-1), _config(config) {
   _poll = std::make_unique<Poll>();

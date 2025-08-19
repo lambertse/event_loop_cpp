@@ -19,16 +19,20 @@ FetchContent_MakeAvailable(googletest)
 
 
 # Create test executable
-add_executable(protobuf_quicktest
-    protobuf_quicktest.cpp
+add_executable(unit_test
+    main.cpp
 )
 
 # Link libraries
 target_link_libraries(protobuf_quicktest
     GTest::gtest
     GTest::gtest_main
-    proto_generated
     ${Protobuf_LIBRARIES}
+)
+# Include directories for the test
+target_include_directories(protobuf_quicktest PRIVATE
+    ${CMAKE_SOURCE_DIR}/include
+    ${Protobuf_INCLUDE_DIRS}
 )
 
 # Add test to CTest

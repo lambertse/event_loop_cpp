@@ -61,14 +61,14 @@ set(GENERATED_PROTO_HDRS)
 
 foreach(PROTO_FILE ${PROTO_FILES})
     get_filename_component(PROTO_NAME ${PROTO_FILE} NAME_WE)
-    set(GENERATED_SRC ${CMAKE_CURRENT_SOURCE_DIR}/proto/${PROTO_NAME}.pb.cc)
-    set(GENERATED_HDR ${CMAKE_CURRENT_SOURCE_DIR}/proto/${PROTO_NAME}.pb.h)
+    set(GENERATED_SRC ${CMAKE_CURRENT_SOURCE_DIR}/include/event_loop/proto/${PROTO_NAME}.pb.cc)
+    set(GENERATED_HDR ${CMAKE_CURRENT_SOURCE_DIR}/include/event_loop/proto/${PROTO_NAME}.pb.h)
 
     add_custom_command(
         OUTPUT ${GENERATED_SRC} ${GENERATED_HDR}
         COMMAND protobuf::protoc
         ARGS --proto_path=${CMAKE_CURRENT_SOURCE_DIR}/proto
-             --cpp_out=${CMAKE_CURRENT_SOURCE_DIR}/proto
+             --cpp_out=${CMAKE_CURRENT_SOURCE_DIR}/include/event_loop/proto
              ${PROTO_FILE}
         DEPENDS ${PROTO_FILE} protobuf::protoc
         COMMENT "Generating C++ code from ${PROTO_FILE}"
@@ -88,52 +88,47 @@ target_include_directories(proto_generated PUBLIC
 target_link_libraries(proto_generated PUBLIC protobuf::libprotobuf)
 
 # ============================================================================
-# Shared Library
-# ============================================================================
-add_library(shared_utils STATIC
-    shared/protobuf/protobuf_handler.cpp
-)
-target_include_directories(shared_utils INTERFACE
-    ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/shared
-    ${CMAKE_CURRENT_SOURCE_DIR}/shared/protobuf
-)
-target_link_libraries(shared_utils PUBLIC
-    proto_generated    
-)
-
-# ============================================================================
 # Server Executable
 # ============================================================================
 
-file(GLOB SERVER_SOURCES "server/*.cpp")
-file(GLOB SERVER_PLATFORM_SOURCES "server/${PLATFORM}/*.cpp")
+file(GLOB PROTO_SRCS "include/event_loop/proto/*.cc")
+file(GLOB SHARED_UTILS_SRC "src/shared/*.cpp")
+file(GLOB SERVER_SRC "src/server/*.cpp")
+file(GLOB SERVER_PLATFORM_SRC "src/server/${PLATFORM}/*.cpp")
 
-add_executable(server_${PROJECT_NAME} ${SERVER_SOURCES} ${SERVER_PLATFORM_SOURCES})
+add_executable(server_${PROJECT_NAME} 
+    ${PROTO_SRCS}
+    ${SHARED_UTILS_SRC}
+    ${SERVER_SRC}
+    ${SERVER_PLATFORM_SRC}
+)
 
 target_include_directories(server_${PROJECT_NAME} PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/server
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
 target_link_libraries(server_${PROJECT_NAME} PRIVATE
-    shared_utils
+    protobuf::libprotobuf
 )
 
 # ============================================================================
 # Client Executable
 # ============================================================================
 set(CLIENT_SOURCES
-    client/client_main.cpp
+    src/client/client_main.cpp
 )
 
-add_executable(client_${PROJECT_NAME} ${CLIENT_SOURCES})
+add_executable(client_${PROJECT_NAME}
+    ${CLIENT_SOURCES}
+    ${PROTO_SRCS}
+    ${SHARED_UTILS_SRC})
 
 target_include_directories(client_${PROJECT_NAME} PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/client
+    ${CMAKE_CURRENT_SOURCE_DIR}/include 
 )
 
 target_link_libraries(client_${PROJECT_NAME} PRIVATE
-    shared_utils
+    protobuf::libprotobuf
 )
 
 # ============================================================================

@@ -1,7 +1,5 @@
 
 #include <netinet/in.h>
-#include <shared/logging.h>
-#include <shared/utils.h>
 #include <sys/socket.h>
 #include <unistd.h>
 
@@ -10,8 +8,9 @@
 #include <thread>
 #include <vector>
 
-#include "proto/request.pb.h"
-#include "shared/protobuf/protobuf_handler.h"
+#include "event_loop/proto/request.pb.h"
+#include "event_loop/shared/logging.h"
+#include "event_loop/shared/protobuf_handler.h"
 
 static int send_req(const int &fd, const std::string &data) {
   LOG_INFO("Sending serialized request of size: " +

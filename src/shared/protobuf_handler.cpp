@@ -1,5 +1,4 @@
-#include "proto/request.pb.h"
-#include "protobuf_handler.h"
+#include "event_loop/shared/protobuf_handler.h"
 
 request::Request ProtobufHandler::deserialize(const std::string& data) {
   request::Request req;

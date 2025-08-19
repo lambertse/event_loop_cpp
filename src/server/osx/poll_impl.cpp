@@ -3,9 +3,9 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "../poll.h"
-#include "shared/logging.h"
-#include "shared/utils.h"
+#include "event_loop/poll.h"
+#include "event_loop/shared/logging.h"
+#include "event_loop/shared/utils.h"
 
 bool Poll::init(int fd) {
   _poll_fd = kqueue();

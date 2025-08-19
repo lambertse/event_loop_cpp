@@ -1,10 +1,10 @@
 #include <unistd.h>
 
-#include "connection_manager.h"
-#include "define.h"
-#include "proto/request.pb.h"
-#include "shared/logging.h"
-#include "shared/protobuf/protobuf_handler.h"
+#include "event_loop/connection_manager.h"
+#include "event_loop/define.h"
+#include "event_loop/proto/request.pb.h"
+#include "event_loop/shared/logging.h"
+#include "event_loop/shared/protobuf_handler.h"
 
 ConnectionManager::ConnectionManager() {}
 
@@ -23,10 +23,10 @@ void ConnectionManager::state_request(ConnectionSharedPtr conn) {
   do {
     ssize_t rc = 0;
     do {
-      ssize_t cap = sizeof(conn->rbuf) - conn->rbuf.size();
-      LOG_DEBUG("Reading data, capacity: " + std::to_string(cap));
-      conn->rbuf.resize(conn->rbuf.size() + cap);
-      rc = read(conn->fd, &conn->rbuf[conn->rbuf.size() - cap], cap);
+      size_t cap = k_max_msg - conn->rbuf.size();
+      std::string tmpbuf(cap, '\0');
+      rc = read(conn->fd, &tmpbuf[0], cap);
+      if (rc > 0) conn->rbuf.append(tmpbuf, 0, rc);
     } while (rc < 0 && errno == EINTR);
 
     if (rc < 0) {

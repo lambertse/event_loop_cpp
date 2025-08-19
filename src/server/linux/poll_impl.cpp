@@ -3,8 +3,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "../poll.h"
-#include "shared/logging.h"
+#include "event_loop/poll.h"
+#include "event_loop/shared/logging.h"
 
 bool Poll::init(int fd) {
   struct epoll_event ev;

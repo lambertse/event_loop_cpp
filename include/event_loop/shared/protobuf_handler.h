@@ -1,7 +1,7 @@
 #pragma once
 #include <string>
 
-#include "proto/request.pb.h"
+#include "event_loop/proto/request.pb.h"
 
 class ProtobufHandler {
  public:
